@@ -11,7 +11,6 @@ export function ShoppingList() {
 
   useEffect(() => {
     fetchCategories()
-    fetchItems()
     const unsubscribe = setupRealtimeSubscription()
     
     const cleanupInterval = setInterval(() => {
@@ -58,14 +57,61 @@ export function ShoppingList() {
   }
 
   const setupRealtimeSubscription = () => {
+    // Initial load
+    fetchItems()
+    
     const subscription = supabase
       .channel('food_items_changes')
       .on('postgres_changes', { 
-        event: '*', 
+        event: 'INSERT', 
         schema: 'public', 
         table: 'food_items' 
-      }, () => {
-        fetchItems()
+      }, async (payload) => {
+        // Fetch the full item with category relationship
+        const { data } = await supabase
+          .from('food_items')
+          .select(`
+            *,
+            category:categories(*)
+          `)
+          .eq('id', payload.new.id)
+          .single()
+        
+        if (data) {
+          setItems(prevItems => [data, ...prevItems])
+        }
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'food_items' 
+      }, async (payload) => {
+        // Fetch the updated item with category relationship
+        const { data } = await supabase
+          .from('food_items')
+          .select(`
+            *,
+            category:categories(*)
+          `)
+          .eq('id', payload.new.id)
+          .single()
+        
+        if (data) {
+          setItems(prevItems => 
+            prevItems.map(item => 
+              item.id === data.id ? data : item
+            )
+          )
+        }
+      })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'food_items' 
+      }, (payload) => {
+        setItems(prevItems => 
+          prevItems.filter(item => item.id !== payload.old.id)
+        )
       })
       .subscribe()
 
@@ -138,9 +184,6 @@ export function ShoppingList() {
       
       if (error) throw error
       setNewItemName('')
-      
-      // Refresh the items list after successful insertion
-      await fetchItems()
     } catch (error) {
       console.error('Virhe tuotteen lisäämisessä:', error)
     }
