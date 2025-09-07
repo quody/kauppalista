@@ -60,13 +60,14 @@ export function ShoppingList() {
     // Initial load
     fetchItems()
     
-    const subscription = supabase
+    const channel = supabase
       .channel('food_items_changes')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'food_items' 
       }, async (payload) => {
+        console.log('Realtime INSERT:', payload)
         // Fetch the full item with category relationship
         const { data } = await supabase
           .from('food_items')
@@ -86,6 +87,7 @@ export function ShoppingList() {
         schema: 'public', 
         table: 'food_items' 
       }, async (payload) => {
+        console.log('Realtime UPDATE:', payload)
         // Fetch the updated item with category relationship
         const { data } = await supabase
           .from('food_items')
@@ -109,14 +111,25 @@ export function ShoppingList() {
         schema: 'public', 
         table: 'food_items' 
       }, (payload) => {
+        console.log('Realtime DELETE:', payload)
         setItems(prevItems => 
           prevItems.filter(item => item.id !== payload.old.id)
         )
       })
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to food_items changes')
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Channel subscription error:', err)
+        } else if (status === 'TIMED_OUT') {
+          console.error('Channel subscription timed out')
+        } else {
+          console.log('Channel subscription status:', status)
+        }
+      })
 
     return () => {
-      subscription.unsubscribe()
+      channel.unsubscribe()
     }
   }
 
