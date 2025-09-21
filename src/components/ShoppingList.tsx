@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase, FoodItemWithCategory, Category } from '@/lib/supabase'
+import { LoadingBubblesContainer } from './LoadingBubble'
 
 export function ShoppingList() {
   const [items, setItems] = useState<FoodItemWithCategory[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [newItemName, setNewItemName] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadingBubbles, setLoadingBubbles] = useState<Array<{ id: string; text: string }>>([])
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchCategories()
@@ -185,21 +188,39 @@ export function ShoppingList() {
     e.preventDefault()
     if (!newItemName.trim()) return
 
+    const itemText = newItemName.trim()
+    const bubbleId = `bubble-${Date.now()}-${Math.random()}`
+
+    // Add loading bubble
+    setLoadingBubbles(prev => [...prev, { id: bubbleId, text: itemText }])
+
+    // Clear input immediately and keep focus
+    setNewItemName('')
+    inputRef.current?.focus()
+
     try {
-      const categoryId = await findBestMatchingCategory(newItemName.trim())
-      
+      const categoryId = await findBestMatchingCategory(itemText)
+
       const { error } = await supabase
         .from('food_items')
         .insert([{
-          name: newItemName.trim(),
+          name: itemText,
           category_id: categoryId
         }])
-      
+
       if (error) throw error
-      setNewItemName('')
+
+      // Remove bubble on success
+      setLoadingBubbles(prev => prev.filter(bubble => bubble.id !== bubbleId))
     } catch (error) {
       console.error('Virhe tuotteen lisäämisessä:', error)
+      // Remove bubble on error too
+      setLoadingBubbles(prev => prev.filter(bubble => bubble.id !== bubbleId))
     }
+  }
+
+  const handleBubbleComplete = (bubbleId: string) => {
+    setLoadingBubbles(prev => prev.filter(bubble => bubble.id !== bubbleId))
   }
 
   const findBestMatchingCategory = async (itemName: string): Promise<number> => {
@@ -313,9 +334,15 @@ export function ShoppingList() {
           )}
         </div>
 
+        <LoadingBubblesContainer
+          bubbles={loadingBubbles}
+          onBubbleComplete={handleBubbleComplete}
+        />
+
         <form onSubmit={addItem} className="sticky bottom-0 bg-white pt-4">
           <div className="flex gap-2">
             <input
+              ref={inputRef}
               type="text"
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
