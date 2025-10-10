@@ -12,13 +12,65 @@ export function HoppingBunny() {
   const [direction, setDirection] = useState(1) // 1 = right, -1 = left
   const [shouldReverseAfterIdle, setShouldReverseAfterIdle] = useState(false)
   const [justReversed, setJustReversed] = useState(false)
-  const [isFalling, setIsFalling] = useState(true)
+  const [isFalling, setIsFalling] = useState(false)
   const [fallSpeed, setFallSpeed] = useState(0)
   const [justLanded, setJustLanded] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ mouseX: 0, mouseY: 0, bunnyX: 0, bunnyY: 0 })
+  const [isOnShelf, setIsOnShelf] = useState(false)
   const bunnyRef = useRef<HTMLDivElement>(null)
   const hasReversedThisCycle = useRef(false)
+  const lastScrollY = useRef(0)
+  const hasInitialized = useRef(false)
+
+  // Initialize bunny position on highest shelf
+  useEffect(() => {
+    if (hasInitialized.current) return
+
+    // Wait for DOM to be ready
+    const initializePosition = () => {
+      if (!bunnyRef.current) return
+
+      const container = document.getElementById('bunny-container')
+      const shelves = document.querySelectorAll('.bunny-shelf')
+      if (!container || shelves.length === 0) {
+        // Retry if elements aren't ready
+        setTimeout(initializePosition, 100)
+        return
+      }
+
+      // Center bunny horizontally in container
+      const containerRect = container.getBoundingClientRect()
+      const bunnyRect = bunnyRef.current.getBoundingClientRect()
+      const centerX = (containerRect.width - bunnyRect.width) / 2
+      setPosition(centerX)
+
+      // Find the highest shelf (smallest bottom value - highest on screen)
+      let highestShelf: Element | null = null
+      let highestTop = Infinity
+
+      shelves.forEach((shelf) => {
+        const rect = shelf.getBoundingClientRect()
+        if (rect.bottom < highestTop) {
+          highestTop = rect.bottom
+          highestShelf = shelf
+        }
+      })
+
+      if (highestShelf) {
+        const SPRITE_BOTTOM_PADDING = 20
+        const distanceToShelf = highestTop - bunnyRect.bottom
+
+        setVerticalPosition(distanceToShelf + SPRITE_BOTTOM_PADDING)
+        setIsOnShelf(true)
+        setIsFalling(false)
+        hasInitialized.current = true
+      }
+    }
+
+    // Small delay to ensure DOM is ready
+    setTimeout(initializePosition, 0)
+  }, [])
 
   // Handle dragging
   useEffect(() => {
@@ -34,7 +86,26 @@ export function HoppingBunny() {
       setVerticalPosition(dragStart.bunnyY + deltaY)
     }
 
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault() // Prevent scrolling while dragging
+      const touch = e.touches[0]
+      // Calculate how much the touch has moved from initial position
+      const deltaX = touch.clientX - dragStart.mouseX
+      const deltaY = touch.clientY - dragStart.mouseY
+
+      // Add delta to initial bunny position
+      setPosition(dragStart.bunnyX + deltaX)
+      setVerticalPosition(dragStart.bunnyY + deltaY)
+    }
+
     const handleMouseUp = () => {
+      setIsDragging(false)
+      // Re-enable falling after drag
+      setIsFalling(true)
+      setFallSpeed(1)
+    }
+
+    const handleTouchEnd = () => {
       setIsDragging(false)
       // Re-enable falling after drag
       setIsFalling(true)
@@ -43,14 +114,19 @@ export function HoppingBunny() {
 
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+    window.addEventListener('touchend', handleTouchEnd)
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
     }
   }, [isDragging, dragStart])
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault()
     // Store initial mouse position and bunny position
     setDragStart({
       mouseX: e.clientX,
@@ -61,6 +137,23 @@ export function HoppingBunny() {
     setIsDragging(true)
     setIsFalling(false) // Stop falling while dragging
     setFallSpeed(0)
+    setIsOnShelf(false) // Clear shelf status when dragging
+  }
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const touch = e.touches[0]
+    // Store initial touch position and bunny position
+    setDragStart({
+      mouseX: touch.clientX,
+      mouseY: touch.clientY,
+      bunnyX: position,
+      bunnyY: verticalPosition,
+    })
+    setIsDragging(true)
+    setIsFalling(false) // Stop falling while dragging
+    setFallSpeed(0)
+    setIsOnShelf(false) // Clear shelf status when dragging
   }
 
   useEffect(() => {
@@ -239,6 +332,7 @@ export function HoppingBunny() {
         console.log('Starting fall, bunny:', bunnyRect.bottom, 'surface:', nearestSurfaceTop)
         setIsFalling(true)
         setFallSpeed(1)
+        setIsOnShelf(false) // Clear shelf status when falling
       }
     } else {
       // On or below surface level
@@ -252,6 +346,13 @@ export function HoppingBunny() {
         // Add sprite padding to push bunny down closer to surface
         setVerticalPosition((pos) => pos + distanceToSurface + SPRITE_BOTTOM_PADDING)
         setJustLanded(true)
+
+        // Check if landed on shelf or floor
+        const floor = document.getElementById('bunny-floor')
+        if (floor) {
+          const floorRect = floor.getBoundingClientRect()
+          setIsOnShelf(Math.abs(nearestSurfaceTop - floorRect.top) > 5)
+        }
       }
     }
   }, [verticalPosition, isFalling, isDragging])
@@ -268,6 +369,35 @@ export function HoppingBunny() {
     return () => clearInterval(gravityInterval)
   }, [isFalling, fallSpeed, isDragging])
 
+  // Handle scroll - keep bunny on shelf when scrolling
+  useEffect(() => {
+    if (!isOnShelf) return // Only adjust when on shelf, not floor
+
+    // Find the scrolling container (the overflow-y-auto div)
+    const container = document.querySelector('.overflow-y-auto')
+    if (!container) return
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement
+      const currentScrollY = target.scrollTop
+      const scrollDelta = currentScrollY - lastScrollY.current
+
+      // Adjust bunny position to compensate for scroll
+      setVerticalPosition((pos) => pos + scrollDelta)
+
+      lastScrollY.current = currentScrollY
+    }
+
+    // Initialize scroll position
+    lastScrollY.current = container.scrollTop
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+    }
+  }, [isOnShelf])
+
   // Sprite sheet: 4 columns x 8 rows, each frame 72x72px
   const column = frame // columns 0, 1, 2, 3
   const row = currentRow
@@ -275,7 +405,6 @@ export function HoppingBunny() {
   // Sprite sheet dimensions
   const FRAME_WIDTH = 72
   const FRAME_HEIGHT = 72
-  const SPRITE_BOTTOM_PADDING = 20 // Transparent padding at bottom of sprite
 
   // Calculate background position in pixels
   // X positions: 0, -72, -144, -216
@@ -287,7 +416,8 @@ export function HoppingBunny() {
     <div
       ref={bunnyRef}
       onMouseDown={handleMouseDown}
-      className="fixed bottom-72 left-72 cursor-grab active:cursor-grabbing position-sticky"
+      onTouchStart={handleTouchStart}
+      className="fixed bottom-0 left-0 cursor-grab active:cursor-grabbing"
       style={{
         width: `${FRAME_WIDTH}px`,
         height: `${FRAME_HEIGHT}px`,
