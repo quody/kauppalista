@@ -286,7 +286,7 @@ export function ShoppingList() {
   }
 
   return (
-    <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen">
+    <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen" id="bunny-container">
       <div className="p-4">
         <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">Ostoslista</h1>
         
@@ -298,7 +298,7 @@ export function ShoppingList() {
           ) : (
             Object.entries(groupedItems).map(([category, categoryItems]) => (
               <div key={category} className="mb-6">
-                <h2 className="text-lg font-semibold text-gray-700 mb-3 border-b pb-1">
+                <h2 className="text-lg font-semibold text-gray-700 mb-3 border-b pb-1" id="bunny-shelf">
                   {category}
                 </h2>
                 <div className="space-y-2">
@@ -342,6 +342,7 @@ export function ShoppingList() {
         <form onSubmit={addItem} className="sticky bottom-0 bg-white pt-4">
           <div className="flex gap-2">
             <input
+              id="bunny-floor"
               ref={inputRef}
               type="text"
               value={newItemName}
