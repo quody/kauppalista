@@ -58,10 +58,9 @@ export function HoppingBunny() {
       })
 
       if (highestShelf) {
-        const SPRITE_BOTTOM_PADDING = 20
         const distanceToShelf = highestTop - bunnyRect.bottom
 
-        setVerticalPosition(distanceToShelf + SPRITE_BOTTOM_PADDING)
+        setVerticalPosition(distanceToShelf)
         setIsOnShelf(true)
         setIsFalling(false)
         hasInitialized.current = true
@@ -338,13 +337,12 @@ export function HoppingBunny() {
       // On or below surface level
       if (isFalling) {
         // Just landed - stop falling and align bunny to surface
-        const SPRITE_BOTTOM_PADDING = 20 // Access constant here
         const distanceToSurface = nearestSurfaceTop - bunnyRect.bottom
         setIsFalling(false)
         setFallSpeed(0)
         // Calculate the exact position to place bunny on surface
         // Add sprite padding to push bunny down closer to surface
-        setVerticalPosition((pos) => pos + distanceToSurface + SPRITE_BOTTOM_PADDING)
+        setVerticalPosition((pos) => pos + distanceToSurface)
         setJustLanded(true)
 
         // Check if landed on shelf or floor
@@ -362,9 +360,9 @@ export function HoppingBunny() {
     if (!isFalling || isDragging) return // Don't apply gravity while dragging
 
     const gravityInterval = setInterval(() => {
-      setFallSpeed((speed) => Math.min(speed + 1, 10)) // Max speed 10px/frame
+      setFallSpeed((speed) => Math.min(speed + 0.1, 5)) // Max speed 10px/frame
       setVerticalPosition((pos) => pos + fallSpeed)
-    }, 50) // Faster interval for smooth falling
+    }, 10) // Faster interval for smooth falling
 
     return () => clearInterval(gravityInterval)
   }, [isFalling, fallSpeed, isDragging])
@@ -405,12 +403,17 @@ export function HoppingBunny() {
   // Sprite sheet dimensions
   const FRAME_WIDTH = 72
   const FRAME_HEIGHT = 72
+  const SPRITE_PADDING = 20 // Transparent padding around actual sprite
+
+  // Actual visible sprite area (without transparent padding)
+  const VISIBLE_WIDTH = FRAME_WIDTH
+  const VISIBLE_HEIGHT = FRAME_HEIGHT - (SPRITE_PADDING * 2)
 
   // Calculate background position in pixels
   // X positions: 0, -72, -144, -216
   // Y position for row 3: -216
   const bgX = -(column * FRAME_WIDTH)
-  const bgY = -(row * FRAME_HEIGHT)
+  const bgY = -(row * FRAME_HEIGHT) - SPRITE_PADDING
 
   return (
     <div
@@ -419,8 +422,8 @@ export function HoppingBunny() {
       onTouchStart={handleTouchStart}
       className="fixed bottom-0 left-0 cursor-grab active:cursor-grabbing"
       style={{
-        width: `${FRAME_WIDTH}px`,
-        height: `${FRAME_HEIGHT}px`,
+        width: `${VISIBLE_WIDTH}px`,
+        height: `${VISIBLE_HEIGHT}px`,
         backgroundImage: 'url(/rabbit.png)',
         backgroundPosition: `${bgX}px ${bgY}px`,
         imageRendering: 'pixelated',
