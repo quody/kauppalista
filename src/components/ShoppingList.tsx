@@ -298,7 +298,7 @@ export function ShoppingList() {
           ) : (
             Object.entries(groupedItems).map(([category, categoryItems]) => (
               <div key={category} className="mb-6">
-                <h2 className="text-lg font-semibold text-gray-700 mb-3 border-b pb-1" id="bunny-shelf">
+                <h2 className="text-lg font-semibold text-gray-700 mb-3 border-b pb-1 bunny-shelf">
                   {category}
                 </h2>
                 <div className="space-y-2">

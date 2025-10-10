@@ -186,34 +186,68 @@ export function HoppingBunny() {
     }
   }, [position, justReversed, currentRow])
 
-  // Gravity and floor detection
+  // Gravity and floor/shelf detection
   useEffect(() => {
     if (isDragging) return // Don't apply gravity while dragging
 
     const floor = document.getElementById('bunny-floor')
-    if (!floor || !bunnyRef.current) return
+    const shelves = document.querySelectorAll('.bunny-shelf')
+    if (!bunnyRef.current) return
 
-    const floorRect = floor.getBoundingClientRect()
     const bunnyRect = bunnyRef.current.getBoundingClientRect()
 
-    // Check if bunny is above the floor
-    const isAboveFloor = bunnyRect.bottom < floorRect.top
+    // Find the nearest surface the bunny should rest on
+    let nearestSurfaceTop: number | null = null
 
-    if (isAboveFloor) {
+    // Always consider the floor as a potential surface
+    if (floor) {
+      const floorRect = floor.getBoundingClientRect()
+      nearestSurfaceTop = floorRect.top
+    }
+
+    // Check shelves - find the nearest shelf the bunny is above and overlaps with
+    shelves.forEach((shelf) => {
+      const shelfRect = shelf.getBoundingClientRect()
+      const bunnyLeft = bunnyRect.left
+      const bunnyRight = bunnyRect.right
+      const shelfLeft = shelfRect.left
+      const shelfRight = shelfRect.right
+
+      // Check horizontal overlap
+      const hasHorizontalOverlap = bunnyRight > shelfLeft && bunnyLeft < shelfRight
+
+      if (hasHorizontalOverlap) {
+        // Bunny overlaps with this shelf horizontally
+        // Only consider shelves that are below the bunny's current position
+        if (shelfRect.bottom >= bunnyRect.bottom - 10) { // Small tolerance
+          // This shelf is a candidate - pick the highest one
+          if (nearestSurfaceTop === null || shelfRect.bottom < nearestSurfaceTop) {
+            nearestSurfaceTop = shelfRect.bottom
+          }
+        }
+      }
+    })
+
+    if (nearestSurfaceTop === null) return
+
+    // Check if bunny is above the surface
+    const isAboveSurface = bunnyRect.bottom < nearestSurfaceTop - 2 // Small tolerance
+
+    if (isAboveSurface) {
       // Should be falling
       if (!isFalling) {
         setIsFalling(true)
         setFallSpeed(1)
       }
     } else {
-      // On or below floor level
+      // On or below surface level
       if (isFalling) {
-        // Just landed - stop falling and align bunny to floor
+        // Just landed - stop falling and align bunny to surface
         setIsFalling(false)
         setFallSpeed(0)
-        // Calculate the exact position to place bunny on floor
-        const distanceToFloor = floorRect.top - bunnyRect.bottom
-        setVerticalPosition((pos) => pos + distanceToFloor)
+        // Calculate the exact position to place bunny on surface
+        const distanceToSurface = nearestSurfaceTop - bunnyRect.bottom
+        setVerticalPosition((pos) => pos + distanceToSurface)
         setJustLanded(true)
       }
     }
@@ -249,7 +283,7 @@ export function HoppingBunny() {
     <div
       ref={bunnyRef}
       onMouseDown={handleMouseDown}
-      className="fixed bottom-48 left-48 cursor-grab active:cursor-grabbing"
+      className="fixed bottom-72 left-72 cursor-grab active:cursor-grabbing"
       style={{
         width: `${FRAME_WIDTH}px`,
         height: `${FRAME_HEIGHT}px`,
