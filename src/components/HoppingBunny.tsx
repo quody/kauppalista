@@ -15,16 +15,61 @@ export function HoppingBunny() {
   const [isFalling, setIsFalling] = useState(true)
   const [fallSpeed, setFallSpeed] = useState(0)
   const [justLanded, setJustLanded] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ mouseX: 0, mouseY: 0, bunnyX: 0, bunnyY: 0 })
   const bunnyRef = useRef<HTMLDivElement>(null)
   const hasReversedThisCycle = useRef(false)
 
+  // Handle dragging
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Calculate how much the mouse has moved from initial position
+      const deltaX = e.clientX - dragStart.mouseX
+      const deltaY = e.clientY - dragStart.mouseY
+
+      // Add delta to initial bunny position
+      setPosition(dragStart.bunnyX + deltaX)
+      setVerticalPosition(dragStart.bunnyY + deltaY)
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+      // Re-enable falling after drag
+      setIsFalling(true)
+      setFallSpeed(1)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, dragStart])
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Store initial mouse position and bunny position
+    setDragStart({
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      bunnyX: position,
+      bunnyY: verticalPosition,
+    })
+    setIsDragging(true)
+    setIsFalling(false) // Stop falling while dragging
+    setFallSpeed(0)
+  }
+
   useEffect(() => {
     const interval = setInterval(() => {
-      if (isPaused) return
+      if (isPaused || isDragging) return // Don't animate while dragging
 
       // Handle falling
       if (isFalling) {
-        // Stay on frame 2 (third hopping frame) while falling
+        // Stay on frame 3 (last hopping frame) while falling
         setFrame(3)
         // Don't do any other animation logic while falling
         return
@@ -90,7 +135,7 @@ export function HoppingBunny() {
     }, 150) // Change frame every 150ms for a nice hopping effect
 
     return () => clearInterval(interval)
-  }, [isPaused, currentRow, isReversingIdle, direction, shouldReverseAfterIdle, isFalling, justLanded])
+  }, [isPaused, currentRow, isReversingIdle, direction, shouldReverseAfterIdle, isFalling, justLanded, isDragging])
 
   // Check if bunny is near container edge (within 40px) during hopping
   useEffect(() => {
@@ -143,6 +188,8 @@ export function HoppingBunny() {
 
   // Gravity and floor detection
   useEffect(() => {
+    if (isDragging) return // Don't apply gravity while dragging
+
     const floor = document.getElementById('bunny-floor')
     if (!floor || !bunnyRef.current) return
 
@@ -170,11 +217,11 @@ export function HoppingBunny() {
         setJustLanded(true)
       }
     }
-  }, [verticalPosition, isFalling])
+  }, [verticalPosition, isFalling, isDragging])
 
   // Apply gravity when falling
   useEffect(() => {
-    if (!isFalling) return
+    if (!isFalling || isDragging) return // Don't apply gravity while dragging
 
     const gravityInterval = setInterval(() => {
       setFallSpeed((speed) => Math.min(speed + 1, 10)) // Max speed 10px/frame
@@ -182,7 +229,7 @@ export function HoppingBunny() {
     }, 50) // Faster interval for smooth falling
 
     return () => clearInterval(gravityInterval)
-  }, [isFalling, fallSpeed])
+  }, [isFalling, fallSpeed, isDragging])
 
   // Sprite sheet: 4 columns x 8 rows, each frame 72x72px
   const column = frame // columns 0, 1, 2, 3
@@ -201,7 +248,8 @@ export function HoppingBunny() {
   return (
     <div
       ref={bunnyRef}
-      className="fixed bottom-48 left-48 pointer-events-none"
+      onMouseDown={handleMouseDown}
+      className="fixed bottom-48 left-48 cursor-grab active:cursor-grabbing"
       style={{
         width: `${FRAME_WIDTH}px`,
         height: `${FRAME_HEIGHT}px`,
