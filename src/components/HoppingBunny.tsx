@@ -322,8 +322,10 @@ export function HoppingBunny() {
 
     if (nearestSurfaceTop === null) return
 
-    // Check if bunny is above the surface
-    const isAboveSurface = bunnyRect.bottom < nearestSurfaceTop
+    // Add tolerance to prevent bouncing with subpixel movements
+    const LANDING_TOLERANCE = 2
+    const distanceToSurface = nearestSurfaceTop - bunnyRect.bottom
+    const isAboveSurface = distanceToSurface > LANDING_TOLERANCE
 
     if (isAboveSurface) {
       // Should be falling
@@ -333,24 +335,19 @@ export function HoppingBunny() {
         setFallSpeed(1)
         setIsOnShelf(false) // Clear shelf status when falling
       }
-    } else {
-      // On or below surface level
-      if (isFalling) {
-        // Just landed - stop falling and align bunny to surface
-        const distanceToSurface = nearestSurfaceTop - bunnyRect.bottom
-        setIsFalling(false)
-        setFallSpeed(0)
-        // Calculate the exact position to place bunny on surface
-        // Add sprite padding to push bunny down closer to surface
-        setVerticalPosition((pos) => pos + distanceToSurface)
-        setJustLanded(true)
+    } else if (isFalling) {
+      // Just landed - stop falling and snap to exact surface position
+      setIsFalling(false)
+      setFallSpeed(0)
+      // Snap bunny to exact surface position
+      setVerticalPosition((pos) => pos + distanceToSurface)
+      setJustLanded(true)
 
-        // Check if landed on shelf or floor
-        const floor = document.getElementById('bunny-floor')
-        if (floor) {
-          const floorRect = floor.getBoundingClientRect()
-          setIsOnShelf(Math.abs(nearestSurfaceTop - floorRect.top) > 5)
-        }
+      // Check if landed on shelf or floor
+      const floor = document.getElementById('bunny-floor')
+      if (floor) {
+        const floorRect = floor.getBoundingClientRect()
+        setIsOnShelf(Math.abs(nearestSurfaceTop - floorRect.top) > 5)
       }
     }
   }, [verticalPosition, isFalling, isDragging])
