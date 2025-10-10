@@ -96,7 +96,6 @@ export function HoppingBunny() {
             setCurrentRow(3) // Go back to row 4 (hopping)
             // Reverse direction if we were near the edge (only once!)
             if (shouldReverseAfterIdle && !hasReversedThisCycle.current) {
-              console.log('Reversing direction')
               setDirection((d) => -d)
               hasReversedThisCycle.current = true
               setShouldReverseAfterIdle(false)
@@ -218,9 +217,10 @@ export function HoppingBunny() {
 
       if (hasHorizontalOverlap) {
         // Bunny overlaps with this shelf horizontally
-        // Only consider shelves that are below the bunny's current position
-        if (shelfRect.bottom >= bunnyRect.bottom - 10) { // Small tolerance
-          // This shelf is a candidate - pick the highest one
+        // Consider shelves below the bunny (with padding tolerance)
+        const SPRITE_BOTTOM_PADDING = 20
+        if (shelfRect.bottom >= bunnyRect.bottom - SPRITE_BOTTOM_PADDING - 1) {
+          // This shelf is a candidate - pick the nearest (highest) one
           if (nearestSurfaceTop === null || shelfRect.bottom < nearestSurfaceTop) {
             nearestSurfaceTop = shelfRect.bottom
           }
@@ -231,11 +231,12 @@ export function HoppingBunny() {
     if (nearestSurfaceTop === null) return
 
     // Check if bunny is above the surface
-    const isAboveSurface = bunnyRect.bottom < nearestSurfaceTop - 2 // Small tolerance
+    const isAboveSurface = bunnyRect.bottom < nearestSurfaceTop
 
     if (isAboveSurface) {
       // Should be falling
       if (!isFalling) {
+        console.log('Starting fall, bunny:', bunnyRect.bottom, 'surface:', nearestSurfaceTop)
         setIsFalling(true)
         setFallSpeed(1)
       }
@@ -243,11 +244,13 @@ export function HoppingBunny() {
       // On or below surface level
       if (isFalling) {
         // Just landed - stop falling and align bunny to surface
+        const SPRITE_BOTTOM_PADDING = 20 // Access constant here
+        const distanceToSurface = nearestSurfaceTop - bunnyRect.bottom
         setIsFalling(false)
         setFallSpeed(0)
         // Calculate the exact position to place bunny on surface
-        const distanceToSurface = nearestSurfaceTop - bunnyRect.bottom
-        setVerticalPosition((pos) => pos + distanceToSurface)
+        // Add sprite padding to push bunny down closer to surface
+        setVerticalPosition((pos) => pos + distanceToSurface + SPRITE_BOTTOM_PADDING)
         setJustLanded(true)
       }
     }
@@ -272,6 +275,7 @@ export function HoppingBunny() {
   // Sprite sheet dimensions
   const FRAME_WIDTH = 72
   const FRAME_HEIGHT = 72
+  const SPRITE_BOTTOM_PADDING = 20 // Transparent padding at bottom of sprite
 
   // Calculate background position in pixels
   // X positions: 0, -72, -144, -216
@@ -283,7 +287,7 @@ export function HoppingBunny() {
     <div
       ref={bunnyRef}
       onMouseDown={handleMouseDown}
-      className="fixed bottom-72 left-72 cursor-grab active:cursor-grabbing"
+      className="fixed bottom-72 left-72 cursor-grab active:cursor-grabbing position-sticky"
       style={{
         width: `${FRAME_WIDTH}px`,
         height: `${FRAME_HEIGHT}px`,
