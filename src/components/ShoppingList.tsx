@@ -288,7 +288,7 @@ export function ShoppingList() {
   return (
     <div className="max-w-md mx-auto bg-white shadow-lg min-h-screen" id="bunny-container">
       <div className="p-4">
-        <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">Ostoslista</h1>
+        <h1 className="text-2xl font-bold text-center mb-6 text-gray-800" id="bunny-ceiling">Ostoslista</h1>
         
         <div className="max-h-[calc(100vh-200px)] overflow-y-auto mb-4">
           {Object.keys(groupedItems).length === 0 ? (

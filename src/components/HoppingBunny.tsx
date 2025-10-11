@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 
-const usePhysics = () => {
+export function HoppingBunny() {
   const [position, setPosition] = useState(200)
   const [verticalPosition, setVerticalPosition] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
@@ -14,11 +14,6 @@ const usePhysics = () => {
   const [fallSpeed, setFallSpeed] = useState(0)
   const [justLanded, setJustLanded] = useState(false)
   const [isOnShelf, setIsOnShelf] = useState(false)
-
-  return { position, verticalPosition, isPaused, isReversingIdle, direction, shouldReverseAfterIdle, justReversed, isFalling, fallSpeed, justLanded, isOnShelf, setPosition, setVerticalPosition, setIsPaused, setIsReversingIdle, setDirection, setShouldReverseAfterIdle, setJustReversed, setIsFalling, setFallSpeed, setJustLanded, setIsOnShelf }
-}
-
-export function HoppingBunny() {
   const [frame, setFrame] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ mouseX: 0, mouseY: 0, bunnyX: 0, bunnyY: 0 })
@@ -27,9 +22,7 @@ export function HoppingBunny() {
   const hasReversedThisCycle = useRef(false)
   const lastScrollY = useRef(0)
   const hasInitialized = useRef(false)
-  const { position, verticalPosition, isPaused, isReversingIdle, direction, shouldReverseAfterIdle, justReversed, isFalling, fallSpeed, justLanded, isOnShelf, setPosition, setVerticalPosition, setIsPaused, setIsReversingIdle, setDirection, setShouldReverseAfterIdle, setJustReversed, setIsFalling, setFallSpeed, setJustLanded, setIsOnShelf } = usePhysics()
   const currentSurface = useRef<Element | null>(null)
-  const [currentSnap, setCurrentSnap] = useState<string | null>(null)
 
   const initializePosition = () => {
     if (hasInitialized.current) return
@@ -68,7 +61,6 @@ export function HoppingBunny() {
         setIsOnShelf(true)
         setIsFalling(false)
         currentSurface.current = highestShelf
-        setCurrentSnap("bottom")
         hasInitialized.current = true
       }
     }
@@ -287,6 +279,7 @@ export function HoppingBunny() {
     if (isDragging) return // Don't apply gravity while dragging
 
     const floor = document.getElementById('bunny-floor')
+    const ceiling = document.getElementById('bunny-ceiling')
     const shelves = document.querySelectorAll('.bunny-shelf')
     if (!bunnyRef.current) return
 
@@ -316,8 +309,8 @@ export function HoppingBunny() {
       if (hasHorizontalOverlap) {
         // Bunny overlaps with this shelf horizontally
         // Consider shelves below the bunny (with padding tolerance)
-        const SPRITE_BOTTOM_PADDING = 20
-        if (shelfRect.bottom >= bunnyRect.bottom - SPRITE_BOTTOM_PADDING - 1) {
+        const SPRITE_BOTTOM_PADDING = 10
+        if (shelfRect.bottom >= bunnyRect.bottom - SPRITE_BOTTOM_PADDING - 1 && shelfRect.bottom > (ceiling?.getBoundingClientRect().bottom ?? 0)) {
           // This shelf is a candidate - pick the nearest (highest) one
           if (nearestSurfaceTop === null || shelfRect.bottom < nearestSurfaceTop) {
             nearestSurfaceTop = shelfRect.bottom
@@ -337,7 +330,6 @@ export function HoppingBunny() {
     if (isAboveSurface) {
       // Should be falling
       if (!isFalling) {
-        console.log('Starting fall, bunny:', bunnyRect.bottom, 'surface:', nearestSurfaceTop)
         setIsFalling(true)
         setFallSpeed(1)
         setIsOnShelf(false) // Clear shelf status when falling
@@ -346,7 +338,7 @@ export function HoppingBunny() {
       // Just landed - stop falling and snap to exact surface position
       setIsFalling(false)
       setFallSpeed(0)
-      setCurrentSnap(nearestSurface)
+      currentSurface.current = nearestSurface
       // Snap bunny to exact surface position
       setVerticalPosition((pos) => pos + distanceToSurface)
       setJustLanded(true)
@@ -381,18 +373,31 @@ export function HoppingBunny() {
     if (!container) return
 
     const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement
-      const currentScrollY = target.scrollTop
-      const scrollDelta = currentScrollY - lastScrollY.current
-
       // Adjust bunny position to compensate for scroll
-      setVerticalPosition((pos) => pos + scrollDelta)
+      setVerticalPosition((pos) => {
+        if (currentSurface.current && bunnyRef.current) {
+          const snapSurface = isOnShelf ? "bottom" : "top"
+          const bunnyRect = bunnyRef.current.getBoundingClientRect()
+          const distanceToShelf = currentSurface.current.getBoundingClientRect()[snapSurface] - bunnyRect.bottom
+          return pos + distanceToShelf
+        }
+        return pos
+      })
 
-      lastScrollY.current = currentScrollY
+      const floor = document.getElementById('bunny-floor')
+
+      if (currentSurface.current) {
+        if (currentSurface.current.getBoundingClientRect().bottom < container.getBoundingClientRect().top) {
+          setIsFalling(true)
+          setIsOnShelf(false)
+          // setVerticalPosition(pos => pos + 10)
+          currentSurface.current = null
+        }
+        else if (currentSurface.current.getBoundingClientRect().bottom > (floor?.getBoundingClientRect()?.top ?? 0)) {
+          setIsFalling(true)
+        }
+      }
     }
-
-    // Initialize scroll position
-    lastScrollY.current = container.scrollTop
 
     container.addEventListener('scroll', handleScroll, { passive: true })
 
