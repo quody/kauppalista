@@ -2,33 +2,39 @@
 
 import { useEffect, useState, useRef } from 'react'
 
-export function HoppingBunny() {
-  const [frame, setFrame] = useState(0)
+const usePhysics = () => {
   const [position, setPosition] = useState(200)
   const [verticalPosition, setVerticalPosition] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
-  const [currentRow, setCurrentRow] = useState(3) // Start with row 4 (index 3)
   const [isReversingIdle, setIsReversingIdle] = useState(false)
-  const [direction, setDirection] = useState(1) // 1 = right, -1 = left
+  const [direction, setDirection] = useState(1)
   const [shouldReverseAfterIdle, setShouldReverseAfterIdle] = useState(false)
   const [justReversed, setJustReversed] = useState(false)
   const [isFalling, setIsFalling] = useState(false)
   const [fallSpeed, setFallSpeed] = useState(0)
   const [justLanded, setJustLanded] = useState(false)
+  const [isOnShelf, setIsOnShelf] = useState(false)
+
+  return { position, verticalPosition, isPaused, isReversingIdle, direction, shouldReverseAfterIdle, justReversed, isFalling, fallSpeed, justLanded, isOnShelf, setPosition, setVerticalPosition, setIsPaused, setIsReversingIdle, setDirection, setShouldReverseAfterIdle, setJustReversed, setIsFalling, setFallSpeed, setJustLanded, setIsOnShelf }
+}
+
+export function HoppingBunny() {
+  const [frame, setFrame] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ mouseX: 0, mouseY: 0, bunnyX: 0, bunnyY: 0 })
-  const [isOnShelf, setIsOnShelf] = useState(false)
+  const [currentRow, setCurrentRow] = useState(3) // UI
   const bunnyRef = useRef<HTMLDivElement>(null)
   const hasReversedThisCycle = useRef(false)
   const lastScrollY = useRef(0)
   const hasInitialized = useRef(false)
+  const { position, verticalPosition, isPaused, isReversingIdle, direction, shouldReverseAfterIdle, justReversed, isFalling, fallSpeed, justLanded, isOnShelf, setPosition, setVerticalPosition, setIsPaused, setIsReversingIdle, setDirection, setShouldReverseAfterIdle, setJustReversed, setIsFalling, setFallSpeed, setJustLanded, setIsOnShelf } = usePhysics()
+  const currentSurface = useRef<Element | null>(null)
+  const [currentSnap, setCurrentSnap] = useState<string | null>(null)
 
-  // Initialize bunny position on highest shelf
-  useEffect(() => {
+  const initializePosition = () => {
     if (hasInitialized.current) return
 
-    // Wait for DOM to be ready
-    const initializePosition = () => {
+    const initialize = () => {
       if (!bunnyRef.current) return
 
       const container = document.getElementById('bunny-container')
@@ -39,13 +45,11 @@ export function HoppingBunny() {
         return
       }
 
-      // Center bunny horizontally in container
       const containerRect = container.getBoundingClientRect()
       const bunnyRect = bunnyRef.current.getBoundingClientRect()
       const centerX = (containerRect.width - bunnyRect.width) / 2
       setPosition(centerX)
 
-      // Find the highest shelf (smallest bottom value - highest on screen)
       let highestShelf: Element | null = null
       let highestTop = Infinity
 
@@ -63,16 +67,16 @@ export function HoppingBunny() {
         setVerticalPosition(distanceToShelf)
         setIsOnShelf(true)
         setIsFalling(false)
+        currentSurface.current = highestShelf
+        setCurrentSnap("bottom")
         hasInitialized.current = true
       }
     }
 
-    // Small delay to ensure DOM is ready
-    setTimeout(initializePosition, 0)
-  }, [])
+    setTimeout(initialize, 0)
+  }
 
-  // Handle dragging
-  useEffect(() => {
+  const initializeDragging = () => {
     if (!isDragging) return
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -97,19 +101,14 @@ export function HoppingBunny() {
       setVerticalPosition(dragStart.bunnyY + deltaY)
     }
 
-    const handleMouseUp = () => {
+    const setDragEnd = () => {
       setIsDragging(false)
-      // Re-enable falling after drag
       setIsFalling(true)
       setFallSpeed(1)
     }
-
-    const handleTouchEnd = () => {
-      setIsDragging(false)
-      // Re-enable falling after drag
-      setIsFalling(true)
-      setFallSpeed(1)
-    }
+    
+    const handleMouseUp = setDragEnd
+    const handleTouchEnd = setDragEnd
 
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
@@ -122,7 +121,23 @@ export function HoppingBunny() {
       window.removeEventListener('touchmove', handleTouchMove)
       window.removeEventListener('touchend', handleTouchEnd)
     }
-  }, [isDragging, dragStart])
+  }
+
+  
+  // Initialize bunny position on highest shelf
+  useEffect(initializePosition, [])
+
+  // Handle dragging
+  useEffect(initializeDragging, [isDragging, dragStart])
+
+  const setDragState = () => {
+    setIsDragging(true)
+    setIsFalling(false)
+    setFallSpeed(0)
+    setIsOnShelf(false)
+    setFrame(3)
+    setCurrentRow(3)
+  }
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -133,10 +148,7 @@ export function HoppingBunny() {
       bunnyX: position,
       bunnyY: verticalPosition,
     })
-    setIsDragging(true)
-    setIsFalling(false) // Stop falling while dragging
-    setFallSpeed(0)
-    setIsOnShelf(false) // Clear shelf status when dragging
+    setDragState()
   }
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -149,26 +161,19 @@ export function HoppingBunny() {
       bunnyX: position,
       bunnyY: verticalPosition,
     })
-    setIsDragging(true)
-    setIsFalling(false) // Stop falling while dragging
-    setFallSpeed(0)
-    setIsOnShelf(false) // Clear shelf status when dragging
+    setDragState()
   }
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (isPaused || isDragging) return // Don't animate while dragging
+      if (isPaused || isDragging) return
 
-      // Handle falling
       if (isFalling) {
-        // Stay on frame 3 (last hopping frame) while falling
         setFrame(3)
-        // Don't do any other animation logic while falling
         return
       }
 
       setFrame((prev) => {
-        // If just landed, complete the hop animation
         if (justLanded) {
           if (prev === 2) {
             setJustLanded(false)
@@ -289,6 +294,7 @@ export function HoppingBunny() {
 
     // Find the nearest surface the bunny should rest on
     let nearestSurfaceTop: number | null = null
+    let nearestSurface: Element | null = null
 
     // Always consider the floor as a potential surface
     if (floor) {
@@ -315,6 +321,7 @@ export function HoppingBunny() {
           // This shelf is a candidate - pick the nearest (highest) one
           if (nearestSurfaceTop === null || shelfRect.bottom < nearestSurfaceTop) {
             nearestSurfaceTop = shelfRect.bottom
+            nearestSurface = shelf
           }
         }
       }
@@ -339,6 +346,7 @@ export function HoppingBunny() {
       // Just landed - stop falling and snap to exact surface position
       setIsFalling(false)
       setFallSpeed(0)
+      setCurrentSnap(nearestSurface)
       // Snap bunny to exact surface position
       setVerticalPosition((pos) => pos + distanceToSurface)
       setJustLanded(true)
