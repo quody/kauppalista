@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
   }
@@ -31,6 +29,32 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      favorite_recipes: {
+        Row: {
+          created_at: string | null
+          id: number
+          recipe_id: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: never
+          recipe_id: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: never
+          recipe_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorite_recipes_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: true
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       food_items: {
         Row: {
@@ -66,6 +90,93 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      recipe_ingredients: {
+        Row: {
+          amount: string | null
+          category_id: number | null
+          created_at: string | null
+          id: number
+          name: string
+          recipe_id: number
+          unit: string | null
+        }
+        Insert: {
+          amount?: string | null
+          category_id?: number | null
+          created_at?: string | null
+          id?: never
+          name: string
+          recipe_id: number
+          unit?: string | null
+        }
+        Update: {
+          amount?: string | null
+          category_id?: number | null
+          created_at?: string | null
+          id?: never
+          name?: string
+          recipe_id?: number
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_ingredients_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_ingredients_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipes: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: number
+          image_url: string | null
+          instructions: string | null
+          is_user_created: boolean | null
+          prep_time: string | null
+          servings: string | null
+          source_site: string | null
+          source_url: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: never
+          image_url?: string | null
+          instructions?: string | null
+          is_user_created?: boolean | null
+          prep_time?: string | null
+          servings?: string | null
+          source_site?: string | null
+          source_url?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: never
+          image_url?: string | null
+          instructions?: string | null
+          is_user_created?: boolean | null
+          prep_time?: string | null
+          servings?: string | null
+          source_site?: string | null
+          source_url?: string | null
+          title?: string
+        }
+        Relationships: []
       }
     }
     Views: {
