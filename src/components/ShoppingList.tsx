@@ -300,8 +300,8 @@ export function ShoppingList() {
                     key={item.id}
                     className={`flex items-center p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                       item.crossed_out
-                        ? 'bg-gray-50 text-gray-400'
-                        : 'bg-white shadow-sm hover:shadow-md text-gray-800 border border-gray-100'
+                        ? 'bg-gray-50/50 text-gray-400'
+                        : 'text-gray-800 active:bg-gray-50'
                     }`}
                     onClick={() => toggleItem(item.id, item.crossed_out)}
                   >

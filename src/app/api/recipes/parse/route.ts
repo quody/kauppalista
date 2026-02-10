@@ -1,5 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+function stripHtmlToText(html: string): string {
+  // Remove script, style, nav, footer, header, aside, svg tags and their content
+  let cleaned = html.replace(/<(script|style|nav|footer|header|aside|svg|noscript|iframe|link|meta)[\s\S]*?<\/\1>/gi, '')
+  // Remove remaining HTML tags
+  cleaned = cleaned.replace(/<[^>]+>/g, ' ')
+  // Decode common HTML entities
+  cleaned = cleaned.replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+  // Collapse whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ').trim()
+  return cleaned
+}
+
+function extractJsonLd(html: string): object | null {
+  // Look for JSON-LD recipe structured data (schema.org)
+  const jsonLdRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  let match
+  while ((match = jsonLdRegex.exec(html)) !== null) {
+    try {
+      const data = JSON.parse(match[1])
+      // Could be a single object or an array
+      if (Array.isArray(data)) {
+        const recipe = data.find((item: Record<string, unknown>) => item['@type'] === 'Recipe')
+        if (recipe) return recipe
+      } else if (data['@type'] === 'Recipe') {
+        return data
+      } else if (data['@graph']) {
+        const recipe = data['@graph'].find((item: Record<string, unknown>) => item['@type'] === 'Recipe')
+        if (recipe) return recipe
+      }
+    } catch {
+      // Invalid JSON-LD, continue searching
+    }
+  }
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { url } = await request.json()
@@ -8,22 +49,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 })
     }
 
-    // Fetch the page content
+    // Fetch the page content with a realistic browser User-Agent
     let pageContent: string
     try {
       const pageResponse = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; KauppalistaBot/1.0)',
-          'Accept': 'text/html,application/xhtml+xml',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'fi-FI,fi;q=0.9,en;q=0.8',
         },
       })
+      if (!pageResponse.ok) {
+        return NextResponse.json({ error: `Sivun hakeminen epaonnistui (${pageResponse.status})` }, { status: 400 })
+      }
       pageContent = await pageResponse.text()
     } catch {
       return NextResponse.json({ error: 'Sivun hakeminen epaonnistui' }, { status: 400 })
     }
 
-    // Trim to reasonable size for Claude
-    const trimmedContent = pageContent.substring(0, 15000)
+    // Try to extract JSON-LD structured data first (most token-efficient)
+    const jsonLd = extractJsonLd(pageContent)
+    let contentForClaude: string
+
+    if (jsonLd) {
+      // Send only the structured data - much smaller than raw HTML
+      contentForClaude = JSON.stringify(jsonLd, null, 2).substring(0, 8000)
+    } else {
+      // Strip HTML to plain text to maximize useful content per character
+      const plainText = stripHtmlToText(pageContent)
+      contentForClaude = plainText.substring(0, 8000)
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -34,15 +89,15 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-3-7-sonnet-20250219',
-        max_tokens: 4096,
+        max_tokens: 2048,
         temperature: 0,
         messages: [
           {
             role: 'user',
-            content: `Pura tasta HTML-sivusta reseptin tiedot. Sivu on osoitteesta: ${url}
+            content: `Pura tasta ${jsonLd ? 'JSON-LD-datasta' : 'sivun tekstisisallosta'} reseptin tiedot. Sivu on osoitteesta: ${url}
 
-HTML-sisalto (lyhennetty):
-${trimmedContent}
+${jsonLd ? 'JSON-LD data' : 'Sivun tekstisisalto'}:
+${contentForClaude}
 
 Vastaa VAIN JSON-muodossa (ei muuta tekstia):
 {

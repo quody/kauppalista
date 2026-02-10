@@ -17,14 +17,14 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-3-7-sonnet-20250219',
-        max_tokens: 4096,
+        max_tokens: 2048,
         temperature: 0.7,
         messages: [
           {
             role: 'user',
             content: `Olet suomalainen ruoka-asiantuntija. Kayttaja etsii resepteja hakusanalla: "${query}"
 
-Ehdota 4-6 suomalaista reseptia jotka sopivat hakuun. Voit kayttaa resepteja jotka loytyisivat esim. Valio.fi tai K-Ruoka (Pirkka) sivuilta.
+Ehdota 2 suomalaista reseptia jotka sopivat hakuun. Voit kayttaa resepteja jotka loytyisivat esim. Valio.fi tai K-Ruoka (Pirkka) sivuilta.
 
 Vastaa JSON-muodossa (EI muuta tekstia, VAIN JSON):
 [
