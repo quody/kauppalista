@@ -9,6 +9,7 @@ export async function POST() {
       .from('food_items')
       .delete()
       .eq('crossed_out', true)
+      .eq('is_recurring', false)
       .lt('crossed_out_at', twelveHoursAgo)
     
     if (error) throw error

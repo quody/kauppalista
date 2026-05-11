@@ -39,7 +39,10 @@ export type Database = {
           crossed_out: boolean | null
           crossed_out_at: string | null
           id: number
+          is_recurring: boolean
           name: string
+          paused_until: string | null
+          quantity: number
         }
         Insert: {
           category_id?: number | null
@@ -47,7 +50,10 @@ export type Database = {
           crossed_out?: boolean | null
           crossed_out_at?: string | null
           id?: never
+          is_recurring?: boolean
           name: string
+          paused_until?: string | null
+          quantity?: number
         }
         Update: {
           category_id?: number | null
@@ -55,7 +61,10 @@ export type Database = {
           crossed_out?: boolean | null
           crossed_out_at?: string | null
           id?: never
+          is_recurring?: boolean
           name?: string
+          paused_until?: string | null
+          quantity?: number
         }
         Relationships: [
           {
